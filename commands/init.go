@@ -15,21 +15,30 @@ import (
 // If file exists, warn and exit
 // If file does not exist, write sample to given directory
 func SeedInit(directory string) error {
-	seedFileName, exists, _ := util.GetSeedFileName(directory)
-	if exists {
+	seedFileName, exists, err := util.GetSeedFileName(directory)
+	if err != nil && exists {
+		//an error occurred other than the file not existing, i.e. permission error
+		fmt.Fprintf(os.Stderr, "ERROR: Error occurred writing example Seed manifest to %s.\n%s\n",
+			seedFileName, err.Error())
+		return errors.New("Error writing example Seed manifest.")
+	} else if exists {
 		msg := "Pre-existing " + seedFileName + " found. Existing file left unmodified."
-		return errors.New(msg)
+		fmt.Fprintf(os.Stderr, "%s\n", msg)
+		return nil
 	}
+
 
 	// TODO: We need to support init of all supported schema versions in the future
 	exampleSeedJson, _ := constants.Asset("schema/0.1.0/seed.manifest.example.json")
 
-	err := ioutil.WriteFile(seedFileName, exampleSeedJson, os.ModePerm)
+	err = ioutil.WriteFile(seedFileName, exampleSeedJson, os.ModePerm)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: Error occurred writing example Seed manifest to %s.\n%s\n",
 			seedFileName, err.Error())
 		return errors.New("Error writing example Seed manifest.")
 	}
+
+	fmt.Fprintf(os.Stderr, "Created Seed file: %s\n", seedFileName)
 
 	return nil
 }

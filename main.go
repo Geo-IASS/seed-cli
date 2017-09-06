@@ -164,6 +164,7 @@ func main() {
 		metadataSchema := runCmd.Lookup(constants.SchemaFlag).Value.String()
 		err := commands.DockerRun(imageName, outputDir, metadataSchema, inputs, settings, mounts, rmFlag)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 			panic(util.Exit{1})
 		}
 		panic(util.Exit{0})
@@ -197,7 +198,7 @@ func main() {
 
 	// seed pull: Pulls a remote image and tags it as a local image
 	if pullCmd.Parsed() {
-		imageName := runCmd.Lookup(constants.ImgNameFlag).Value.String()
+		imageName := pullCmd.Lookup(constants.ImgNameFlag).Value.String()
 		registry := pullCmd.Lookup(constants.RegistryFlag).Value.String()
 		org := pullCmd.Lookup(constants.OrgFlag).Value.String()
 		user := pullCmd.Lookup(constants.UserFlag).Value.String()
@@ -460,6 +461,7 @@ func DefineFlags() {
 	DefineListFlags()
 	DefineSearchFlags()
 	DefinePublishFlags()
+	DefinePullFlags()
 	DefineValidateFlags()
 	versionCmd = flag.NewFlagSet(constants.VersionCommand, flag.ExitOnError)
 	versionCmd.Usage = func() {
@@ -535,7 +537,7 @@ func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "A test runner for seed spec compliant algorithms\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  build \tBuilds Seed compliant Docker image\n")
-	fmt.Fprintf(os.Stderr, "  init \tInitialize new project with example seed.manifest.json file\n")
+	fmt.Fprintf(os.Stderr, "  init  \tInitialize new project with example seed.manifest.json file\n")
 	fmt.Fprintf(os.Stderr, "  list  \tAllows for listing of all Seed compliant images residing on the local system\n")
 	fmt.Fprintf(os.Stderr, "  publish\tAllows for publish of Seed compliant images to remote Docker registry\n")
 	fmt.Fprintf(os.Stderr, "  run   \tExecutes Seed compliant Docker docker image\n")

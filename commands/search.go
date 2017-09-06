@@ -6,10 +6,8 @@ import (
 	"strings"
 
 	"github.com/ngageoint/seed-cli/constants"
-	"github.com/ngageoint/seed-cli/dockerHubRegistry"
+	RegistryFactory "github.com/ngageoint/seed-cli/registry"
 	"github.com/ngageoint/seed-cli/util"
-
-	"github.com/heroku/docker-registry-client/registry"
 )
 
 //DockerSearch executes the seed search command
@@ -20,77 +18,19 @@ func DockerSearch(url, org, filter, username, password string) ([]string, error)
 		url = constants.DefaultRegistry
 	}
 
-	httpFallback := ""
-	if !strings.HasPrefix(url, "http") {
-		httpFallback = "http://" + url
-		url = "https://" + url
-	}
-
 	if org == "" {
 		org = constants.DefaultOrg
 	}
 
-	dockerHub := false
-	if strings.Contains(url, "hub.docker.com") || strings.Contains(url, "index.docker.io") || strings.Contains(url, "registry-1.docker.io") {
-		url = "https://hub.docker.com"
-		dockerHub = true
+	registry, err := RegistryFactory.CreateRegistry(url, username, password)
+	if registry != nil && err == nil {
+		images, err := registry.Images(org)
+		return images, err
 	}
 
-	var images []string
-	var err error
-	if dockerHub { //_catalog is disabled on docker hub, cannot get list of images so get all of the images for the org (if specified)
-		hub, err := dockerHubRegistry.New(url)
-		if err != nil {
-			hub, err = dockerHubRegistry.New(httpFallback)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, err.Error())
-				return nil, err
-			}
-		}
-		images, err = hub.UserRepositories(org)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, err.Error())
-			return nil, err
-		}
-	} else {
-		hub, err := registry.New(url, username, password)
-		if err != nil {
-			hub, err = registry.New(httpFallback, username, password)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, err.Error())
-				return nil, err
-			}
-		}
-		repositories, err := hub.Repositories()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, err.Error())
-			return nil, err
-		}
-		for _, repo := range repositories {
-			tags, err := hub.Tags(repo)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, err.Error())
-				continue
-			}
-			for _, tag := range tags {
-				images = append(images, repo + ":" + tag)
-			}
-		}
+	checkError(err, url, username, password)
 
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
-		return nil, err
-	}
-
-	var stringImages []string
-	for _, image := range images {
-		if strings.Contains(image, "-seed") {
-			stringImages = append(stringImages, image)
-		}
-	}
-
-	return stringImages, nil
+	return nil, err
 }
 
 //PrintSearchUsage prints the seed search usage information, then exits the program
@@ -109,4 +49,25 @@ func PrintSearchUsage() {
 	fmt.Fprintf(os.Stderr, "  -%s -%s\tPassword to login to remote registry (default is anonymous).\n",
 		constants.ShortPassFlag, constants.PassFlag)
 	panic(util.Exit{0})
+}
+
+func checkError(err error, url, username, password string) {
+	if err == nil {
+		return
+	}
+
+	errStr := err.Error()
+
+	if strings.Contains(errStr, "status=401") {
+		if username == "" || password == "" {
+			fmt.Fprintf(os.Stderr, "The specified registry requires a login.  Please try again with a username (-u) and password (-p).\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Incorrect username/password.\n")
+		}
+	} else if strings.Contains(errStr, "status=404") {
+		fmt.Fprintf(os.Stderr, "Connected to registry but received a 404 error. Please check the url and try again. \n")
+	} else {
+		fmt.Fprintf(os.Stderr, "Could not connect to the specified registry. Please check the url and try again. \n")
+	}
+
 }
